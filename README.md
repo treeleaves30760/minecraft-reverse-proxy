@@ -17,5 +17,5 @@ Create config.json base on config-example.json
 Then run the service
 
 ```bash
-node 
+npm run start
 ```
