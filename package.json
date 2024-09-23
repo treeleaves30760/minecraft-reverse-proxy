@@ -1,0 +1,11 @@
+{
+	"name": "minecraft-reverse-proxy",
+	"version": "1.0.0",
+	"description": "This is a tool for multiple minecraft server on the same server",
+	"main": "reverse-proxy-server.js",
+	"scripts": {
+		"start": "node reverse-proxy-server.js"
+	},
+	"author": "",
+	"license": "ISC"
+}
