@@ -4,8 +4,11 @@
 	"description": "This is a tool for multiple minecraft server on the same server",
 	"main": "reverse-proxy-server.js",
 	"scripts": {
-		"start": "node reverse-proxy-server.js"
+		"start": "node reverse-proxy-server.js",
+		"start:verbose": "node reverse-proxy-server.js -verbose 1",
+		"start:info": "node reverse-proxy-server.js -verbose 2",
+		"start:quiet": "node reverse-proxy-server.js -verbose 3"
 	},
-	"author": "",
+	"author": "NightTangerine",
 	"license": "ISC"
 }
