@@ -55,6 +55,13 @@ const server = net.createServer((client) => {
 		log(1, "從客戶端接收數據:", data.length, "字節");
 
 		if (!target) {
+			// 檢查 handshakeBuffer 是否有效
+			if (handshakeBuffer === null) {
+				log(1, "握手緩衝區無效，重新分配");
+				handshakeBuffer = Buffer.alloc(256);
+				handshakeOffset = 0;
+			}
+
 			// 嘗試解析握手包
 			const remainingSpace = handshakeBuffer.length - handshakeOffset;
 			const copyLength = Math.min(remainingSpace, data.length);
@@ -89,15 +96,24 @@ const server = net.createServer((client) => {
 				// 釋放握手緩衝區
 				handshakeBuffer = null;
 			}
+		} else {
+			// 如果目標已經確定，直接轉發數據
+			target.write(data);
 		}
 	});
 
 	client.on("end", () => {
 		log(2, "客戶端斷開連接");
+		if (target) {
+			target.end();
+		}
 	});
 
 	client.on("error", (err) => {
 		log(2, "客戶端連接錯誤:", err);
+		if (target) {
+			target.end();
+		}
 	});
 });
 
@@ -178,6 +194,8 @@ function connectToTarget(client, target, initialData) {
 		log(2, "目標連接錯誤:", err);
 		client.end();
 	});
+
+	return targetSocket;
 }
 
 // 監聽 25565 端口
