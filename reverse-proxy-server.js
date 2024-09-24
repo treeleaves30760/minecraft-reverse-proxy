@@ -81,27 +81,23 @@ const server = net.createServer((client) => {
 					log(2, "未找到匹配的目標主機名:", handshake.hostname);
 					client.end();
 				}
-				handshakeBuffer = null; // 釋放握手緩衝區
+				// 釋放握手緩衝區
+				handshakeBuffer = null;
 			} else if (handshakeOffset === handshakeBuffer.length) {
 				log(1, "握手緩衝區已滿，但解析不完整");
 				client.end();
-				handshakeBuffer = null; // 釋放握手緩衝區
+				// 釋放握手緩衝區
+				handshakeBuffer = null;
 			}
-		} else {
-			// 如果已經選擇了目標，但又收到了數據，這可能是一個錯誤狀態
-			log(2, "收到意外的數據。結束連接。");
-			client.end();
 		}
 	});
 
 	client.on("end", () => {
 		log(2, "客戶端斷開連接");
-		handshakeBuffer = null; // 確保釋放握手緩衝區
 	});
 
 	client.on("error", (err) => {
 		log(2, "客戶端連接錯誤:", err);
-		handshakeBuffer = null; // 確保釋放握手緩衝區
 	});
 });
 
