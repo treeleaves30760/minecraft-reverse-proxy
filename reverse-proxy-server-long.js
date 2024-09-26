@@ -115,7 +115,117 @@ function createServer() {
     });
 }
 
-// 其他輔助函數 (parseHandshake, readVarInt, selectTarget, connectToTarget, sendErrorResponse, writeVarInt) 保持不變
+function parseHandshake(buffer) {
+    if (buffer.length < 3) return null;
+
+    let offset = 0;
+    const packetLength = readVarInt(buffer, offset);
+    if (!packetLength) return null;
+    offset += packetLength.bytes;
+
+    if (buffer.length < offset + packetLength.value) return null;
+
+    const packetId = readVarInt(buffer, offset);
+    if (!packetId || packetId.value !== 0x00) return null;
+    offset += packetId.bytes;
+
+    const protocolVersion = readVarInt(buffer, offset);
+    if (!protocolVersion) return null;
+    offset += protocolVersion.bytes;
+
+    const hostnameLength = readVarInt(buffer, offset);
+    if (!hostnameLength) return null;
+    offset += hostnameLength.bytes;
+
+    if (buffer.length < offset + hostnameLength.value) return null;
+
+    const hostname = buffer.toString(
+        "utf8",
+        offset,
+        offset + hostnameLength.value
+    );
+
+    return { hostname, protocolVersion: protocolVersion.value };
+}
+
+function readVarInt(buffer, offset) {
+    let value = 0;
+    let length = 0;
+    let currentByte;
+
+    do {
+        if (offset + length >= buffer.length) return null;
+        currentByte = buffer.readUInt8(offset + length);
+        value |= (currentByte & 0x7f) << (length * 7);
+        length++;
+        if (length > 5) return null;
+    } while ((currentByte & 0x80) !== 0);
+
+    return { value, bytes: length };
+}
+
+function selectTarget(hostname) {
+    log(1, "為主機名選擇目標:", hostname);
+    const target = targets.get(hostname);
+    log(1, "選擇的目標:", target);
+    return target || null;
+}
+
+function connectToTarget(client, target, initialData) {
+    log(1, `連接到目標: ${target.host}:${target.port}`);
+    const targetSocket = net.createConnection(target, () => {
+        log(1, "已連接到目標伺服器");
+        log(1, "轉發初始數據:", initialData.length, "字節");
+        targetSocket.write(initialData);
+
+        // 使用 pipe 進行雙向數據傳輸
+        client.pipe(targetSocket);
+        targetSocket.pipe(client);
+    });
+
+    targetSocket.on("end", () => {
+        log(2, "與目標伺服器斷開連接");
+        client.end();
+    });
+
+    targetSocket.on("error", (err) => {
+        log(2, "目標連接錯誤:", err);
+        client.end();
+    });
+}
+
+function sendErrorResponse(client, message) {
+    const response = {
+        text: JSON.stringify({
+            text: message
+        })
+    };
+
+    const jsonResponse = JSON.stringify(response);
+    const data = Buffer.from(jsonResponse, 'utf8');
+
+    const packet = Buffer.alloc(data.length + 5);
+    let offset = 0;
+    offset = writeVarInt(packet, data.length + 1, offset);
+    offset = writeVarInt(packet, 0x00, offset); // Packet ID for disconnect
+    data.copy(packet, offset);
+
+    client.write(packet);
+    client.end();
+}
+
+function writeVarInt(buffer, value, offset) {
+    do {
+        let temp = value & 0b01111111;
+        value >>>= 7;
+        if (value !== 0) {
+            temp |= 0b10000000;
+        }
+        buffer.writeUInt8(temp, offset);
+        offset++;
+    } while (value !== 0);
+    return offset;
+}
 
 // 定期健康檢查
 setInterval(() => {
@@ -126,7 +236,7 @@ setInterval(() => {
         "堆使用大小:", (memoryUsage.heapUsed / 1024 / 1024).toFixed(2), "MB");
 
     // 如果內存使用過高，可以在這裡添加重啟邏輯
-    if (memoryUsage.heapUsed > 1024 * 1024 * 1024) { // 如果堆內存使用超過1GB
+    if (memoryUsage.heapUsed > 4 * 1024 * 1024 * 1024) { // 如果堆內存使用超過4GB
         log(2, "內存使用過高，重新啟動服務器");
         process.exit(1); // 退出進程，依賴外部進程管理器重啟
     }
