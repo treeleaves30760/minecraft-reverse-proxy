@@ -40,7 +40,7 @@ try {
 // 將配置轉換為目標對象
 const targets = new Map();
 config.forEach((item) => {
-    targets.set(item.url_name, { host: item.url_name, port: item.port });
+    targets.set(item.url_name, { host: item.send_url, port: item.send_port });
 });
 
 // 創建 TCP 伺服器
