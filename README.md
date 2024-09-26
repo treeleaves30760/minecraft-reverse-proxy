@@ -17,11 +17,17 @@ Create config.json base on config-example.json
 Then run the service
 
 ```bash
-npm run start
+npm install
+npm run long
 ```
+
+This will use pm2 to create a process that for minecraft proxy.
+
+## Report
 
 If you find any bugs, welcome to make issue for me.
 And please add the screenshot of the error.
+You can use the below command to get the error message.
 
 ```bash
 npm run start:verbose
