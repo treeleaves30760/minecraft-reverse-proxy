@@ -7,8 +7,12 @@
 		"start": "node reverse-proxy-server.js",
 		"start:verbose": "node reverse-proxy-server.js -verbose 1",
 		"start:info": "node reverse-proxy-server.js -verbose 2",
-		"start:quiet": "node reverse-proxy-server.js -verbose 3"
+		"start:quiet": "node reverse-proxy-server.js -verbose 3",
+		"long": "pm2 start reverse-proxy-server.js --name 'minecraft-proxy' --max-memory-restart 1G"
 	},
 	"author": "NightTangerine",
-	"license": "ISC"
+	"license": "ISC",
+	"dependencies": {
+		"pm2": "^5.4.2"
+	}
 }
