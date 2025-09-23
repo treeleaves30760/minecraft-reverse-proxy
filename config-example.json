@@ -1,5 +1,31 @@
 [
-	{ "url_name": "example1.server.com", "send_url": "localhost", "port": 25564 },
-	{ "url_name": "example2.server.com", "send_url": "localhost", "port": 25566 },
-	{ "url_name": "example3.server.com", "send_url": "localhost", "port": 25567 }
+	{
+		"url_name": "example1.server.com",
+		"send_url": "localhost",
+		"send_port": 25564
+	},
+	{
+		"url_name": "example2.server.com",
+		"send_url": "localhost",
+		"send_port": 25566,
+		"proxy_protocol": {
+			"receive": false,
+			"send": true,
+			"version": 1
+		}
+	},
+	{
+		"url_name": "example3.server.com",
+		"send_url": "localhost",
+		"send_port": 25567,
+		"proxy_protocol": {
+			"receive": true,
+			"send": true,
+			"version": 1
+		}
+	},
+	{
+		"url_name": "legacy.server.com",
+		"port": 25568
+	}
 ]

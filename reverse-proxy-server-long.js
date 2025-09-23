@@ -29,7 +29,17 @@ function loadConfig() {
         config = JSON.parse(configData);
         targets.clear();
         config.forEach((item) => {
-            targets.set(item.url_name, { host: item.send_url, port: item.send_port });
+            // 支援新的配置格式，同時向後兼容舊格式
+            const target = {
+                host: item.send_url || 'localhost',
+                port: item.send_port || item.port, // 向後兼容舊的 port 欄位
+                proxyProtocol: item.proxy_protocol || {
+                    receive: false,
+                    send: false,
+                    version: 1
+                }
+            };
+            targets.set(item.url_name, target);
         });
         log(1, "成功載入 config.json:", config);
     } catch (err) {
@@ -46,6 +56,72 @@ fs.watch(path.join(__dirname, "config.json"), (eventType, filename) => {
     }
 });
 
+// Proxy Protocol 處理函數
+function parseProxyProtocol(buffer) {
+    if (buffer.length < 8) return null;
+
+    // 檢查是否為 Proxy Protocol v1
+    const headerStart = buffer.toString('ascii', 0, 5);
+    if (headerStart === 'PROXY') {
+        return parseProxyProtocolV1(buffer);
+    }
+
+    // 檢查是否為 Proxy Protocol v2
+    const v2Signature = Buffer.from([0x0D, 0x0A, 0x0D, 0x0A, 0x00, 0x0D, 0x0A, 0x51, 0x55, 0x49, 0x54, 0x0A]);
+    if (buffer.length >= 12 && buffer.subarray(0, 12).equals(v2Signature)) {
+        log(1, "檢測到 Proxy Protocol v2，目前僅支援 v1");
+        return null;
+    }
+
+    return null;
+}
+
+function parseProxyProtocolV1(buffer) {
+    // 尋找行結束符 \r\n
+    let lineEnd = -1;
+    for (let i = 0; i < Math.min(buffer.length, 107); i++) {
+        if (buffer[i] === 0x0D && i + 1 < buffer.length && buffer[i + 1] === 0x0A) {
+            lineEnd = i;
+            break;
+        }
+    }
+
+    if (lineEnd === -1) return null; // 尚未收到完整的行
+
+    const line = buffer.toString('ascii', 0, lineEnd);
+    const parts = line.split(' ');
+
+    // PROXY TCP4/TCP6 srcIP destIP srcPort destPort
+    if (parts.length !== 6 || parts[0] !== 'PROXY') {
+        log(1, "無效的 Proxy Protocol v1 格式:", line);
+        return null;
+    }
+
+    const [, protocol, srcIP, destIP, srcPort, destPort] = parts;
+
+    if (protocol !== 'TCP4' && protocol !== 'TCP6') {
+        log(1, "不支援的協議:", protocol);
+        return null;
+    }
+
+    return {
+        version: 1,
+        protocol: protocol,
+        srcIP: srcIP,
+        destIP: destIP,
+        srcPort: parseInt(srcPort),
+        destPort: parseInt(destPort),
+        headerLength: lineEnd + 2 // 包含 \r\n
+    };
+}
+
+function generateProxyProtocolV1(srcIP, destIP, srcPort, destPort) {
+    // 判斷是 IPv4 還是 IPv6
+    const protocol = srcIP.includes(':') ? 'TCP6' : 'TCP4';
+    const header = `PROXY ${protocol} ${srcIP} ${destIP} ${srcPort} ${destPort}\r\n`;
+    return Buffer.from(header, 'ascii');
+}
+
 // 主要的服務器邏輯
 function createServer() {
     server = net.createServer((client) => {
@@ -55,6 +131,11 @@ function createServer() {
         let handshakeBuffer = Buffer.alloc(256);
         let handshakeOffset = 0;
         let handshakeCompleted = false;
+        let proxyProtocolParsed = false;
+        let originalClientInfo = {
+            ip: client.remoteAddress,
+            port: client.remotePort
+        };
 
         client.on("data", (data) => {
             try {
@@ -66,13 +147,38 @@ function createServer() {
                     data.copy(handshakeBuffer, handshakeOffset, 0, copyLength);
                     handshakeOffset += copyLength;
 
-                    const handshake = parseHandshake(handshakeBuffer.slice(0, handshakeOffset));
+                    let dataToProcess = handshakeBuffer.slice(0, handshakeOffset);
+                    let dataOffset = 0;
+
+                    // 首先嘗試解析 Proxy Protocol（如果尚未解析）
+                    if (!proxyProtocolParsed) {
+                        const proxyProtocol = parseProxyProtocol(dataToProcess);
+                        if (proxyProtocol) {
+                            log(1, "解析到 Proxy Protocol:", proxyProtocol);
+                            originalClientInfo.ip = proxyProtocol.srcIP;
+                            originalClientInfo.port = proxyProtocol.srcPort;
+                            dataOffset = proxyProtocol.headerLength;
+                            proxyProtocolParsed = true;
+                            log(2, "原始客戶端:", originalClientInfo.ip + ":" + originalClientInfo.port);
+                        } else {
+                            // 沒有 Proxy Protocol 標頭，標記為已解析
+                            proxyProtocolParsed = true;
+                        }
+                    }
+
+                    // 解析 Minecraft 握手包
+                    const handshakeData = dataToProcess.slice(dataOffset);
+                    const handshake = parseHandshake(handshakeData);
                     if (handshake) {
                         log(1, "解析的握手:", handshake);
                         target = selectTarget(handshake.hostname);
                         if (target) {
                             log(2, `路由到 ${target.host}:${target.port}`);
-                            connectToTarget(client, target, Buffer.concat([handshakeBuffer.slice(0, handshakeOffset), data.slice(copyLength)]));
+                            const remainingData = Buffer.concat([
+                                handshakeData,
+                                data.slice(copyLength)
+                            ]);
+                            connectToTarget(client, target, remainingData, originalClientInfo);
                         } else {
                             log(2, "未找到匹配的目標主機名:", handshake.hostname);
                             sendErrorResponse(client, "未找到匹配的目標主機名");
@@ -171,10 +277,23 @@ function selectTarget(hostname) {
     return target || null;
 }
 
-function connectToTarget(client, target, initialData) {
+function connectToTarget(client, target, initialData, originalClientInfo) {
     log(1, `連接到目標: ${target.host}:${target.port}`);
-    const targetSocket = net.createConnection(target, () => {
+    const targetSocket = net.createConnection({ host: target.host, port: target.port }, () => {
         log(1, "已連接到目標伺服器");
+
+        // 檢查是否需要發送 Proxy Protocol 標頭
+        if (target.proxyProtocol && target.proxyProtocol.send) {
+            const proxyHeader = generateProxyProtocolV1(
+                originalClientInfo.ip,
+                targetSocket.localAddress,
+                originalClientInfo.port,
+                targetSocket.localPort
+            );
+            log(1, "發送 Proxy Protocol 標頭:", proxyHeader.toString('ascii').trim());
+            targetSocket.write(proxyHeader);
+        }
+
         log(1, "轉發初始數據:", initialData.length, "字節");
         targetSocket.write(initialData);
 
