@@ -1,0 +1,50 @@
+services:
+  minecraft-proxy:
+    build: .
+    container_name: minecraft-reverse-proxy
+    restart: unless-stopped
+    
+    # Port mapping - Minecraft default port
+    ports:
+      - "25565:25565"
+    
+    # Mount configuration
+    volumes:
+      - ./config.json:/app/config.json:ro
+      # Optional: Mount logs directory
+      - ./logs:/app/logs
+    
+    # Environment variables for configuration
+    environment:
+      - NODE_ENV=production
+      - VERBOSE_LEVEL=2  # Info level logging
+    
+    # Resource limits (adjust based on your needs)
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '1.0'
+        reservations:
+          memory: 256M
+          cpus: '0.5'
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "timeout", "3", "nc", "-z", "localhost", "25565"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# Optional: Example with custom network
+networks:
+  default:
+    name: minecraft-proxy-network

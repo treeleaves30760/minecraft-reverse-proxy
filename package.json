@@ -8,7 +8,15 @@
 		"start:verbose": "node reverse-proxy-server.js -verbose 1",
 		"start:info": "node reverse-proxy-server.js -verbose 2",
 		"start:quiet": "node reverse-proxy-server.js -verbose 3",
-		"long": "pm2 start reverse-proxy-server.js --name 'minecraft-proxy' --max-memory-restart 4G"
+		"long": "pm2 start reverse-proxy-server.js --name 'minecraft-proxy' --max-memory-restart 4G",
+		"docker:build": "docker build -t minecraft-reverse-proxy .",
+		"docker:run": "docker run -d -p 25565:25565 -v $(pwd)/config.json:/app/config.json:ro --name minecraft-proxy minecraft-reverse-proxy",
+		"docker:stop": "docker stop minecraft-proxy && docker rm minecraft-proxy",
+		"docker:logs": "docker logs -f minecraft-proxy",
+		"compose:up": "docker compose up -d",
+		"compose:down": "docker compose down",
+		"compose:logs": "docker compose logs -f",
+		"compose:dev": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d"
 	},
 	"author": "NightTangerine",
 	"license": "ISC",

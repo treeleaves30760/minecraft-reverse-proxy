@@ -7,7 +7,7 @@ const { execSync } = require('child_process');
 let server;
 let config;
 let targets = new Map();
-let verboseLevel = 3;
+let verboseLevel = parseInt(process.env.VERBOSE_LEVEL) || 3;
 
 // 錯誤處理和日誌記錄
 function log(level, ...messages) {

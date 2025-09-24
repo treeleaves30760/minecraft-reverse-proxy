@@ -1,0 +1,22 @@
+[
+	{
+		"url_name": "mc1.example.com",
+		"send_url": "minecraft-server-1",
+		"send_port": 25565
+	},
+	{
+		"url_name": "mc2.example.com",
+		"send_url": "minecraft-server-2", 
+		"send_port": 25565
+	},
+	{
+		"url_name": "proxy.example.com",
+		"send_url": "upstream-server",
+		"send_port": 25565,
+		"proxy_protocol": {
+			"receive": true,
+			"send": true,
+			"version": 1
+		}
+	}
+]

@@ -1,0 +1,26 @@
+# Development override for docker-compose
+# Use with: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+services:
+  minecraft-proxy:
+    # Enable verbose logging for development
+    environment:
+      - NODE_ENV=development
+      - VERBOSE_LEVEL=1  # Most verbose logging
+    
+    # Mount source code for development (optional)
+    volumes:
+      - ./config.json:/app/config.json:ro
+      - ./logs:/app/logs
+      # Uncomment below for live code reloading (requires restart)
+      # - .:/app
+    
+    # Remove resource limits for development
+    deploy: {}
+    
+    # More frequent health checks in development
+    healthcheck:
+      interval: 15s
+      timeout: 3s
+      retries: 2
+      start_period: 5s
