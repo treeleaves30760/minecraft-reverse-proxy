@@ -1,0 +1,43 @@
+# Docker ignore file to reduce build context size
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime files
+config.json
+*.log
+
+# Git and development files
+.git/
+.gitignore
+.gitattributes
+README.md
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test files
+test/
+coverage/
+
+# Build artifacts
+dist/
+build/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# PM2 files (not needed in container)
+ecosystem.config.js
+.pm2/

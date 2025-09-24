@@ -4,3 +4,7 @@ node_modules
 .DS_Store
 
 .claude/
+
+# Docker logs and volumes
+logs/
+*.log
